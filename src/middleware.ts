@@ -1,33 +1,34 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const hostname:any = request.headers.get('host')
+/**
+ * @param req
+ */
+export default function middleware(req:any) {
+  const { pathname } = req.nextUrl;
+  // Get hostname (e.g. vercel.com, test.vercel.app, etc.)
+  const hostname = req.headers.get("host");
 
-  // Redirect to entered subdomain
-  const subdomain = hostname.split('.')[0]
-  if (subdomain) {
-    console.log(`Redirecting to ${hostname}/${subdomain}`)
-    const url = request.nextUrl.clone()
-    url.hostname = hostname.replace(`${subdomain}.`, '')
-    url.pathname = `/${subdomain}` + url.pathname
-    return NextResponse.rewrite(url)
+  // If localhost, assign the host value manually
+  // If prod, get the custom domain/subdomain value by removing the root URL
+  // (in the case of "test.vercel.app", "vercel.app" is the root URL)
+  const currentHost =
+    process.env.NODE_ENV == "production"
+      ? hostname?.replace(`.domain.com`, "") // PUT YOUR DOMAIN HERE
+      : hostname?.replace(`.localhost:3000`, "");
+
+  // Prevent security issues – users should not be able to canonically access
+  // the pages/sites folder and its respective contents. This can also be done
+  // via rewrites to a custom 404 page
+  if (pathname.startsWith(`/_sites`)) {
+    return new Response(null, { status: 404 });
   }
 
-  console.log('middleware: ' + hostname)
+  if (
+    !pathname.includes(".") && // exclude all files in the public folder
+    !pathname.startsWith("/api") // exclude all API routes
+  ) {
+    // rewrite to the current hostname under the pages/sites folder
+    // the main logic component will happen in pages/sites/[site]/index.tsx
+    return NextResponse.rewrite(`/_sites/${currentHost}${pathname}`);
+  }
 }
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '1mb',
-    },
-  },
-}
-
-
-// if (request.nextUrl.pathname === '/dashboard'){
-//   const url = request.nextUrl.clone()
-//   url.pathname = '/user'
-//   return NextResponse.redirect(url)
-// }
